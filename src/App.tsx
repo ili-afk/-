@@ -5,9 +5,8 @@ import { Send, Loader2, MessageSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// ВАЖНО: Для GitHub Pages мы оставляем токен как фоллбэк. 
-// В реальных (коммерческих) проектах хранить токены на клиенте небезопасно!
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "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";
+// ВАЖНО: В реальных (коммерческих) проектах хранить токены на клиенте небезопасно!
+const OPENROUTER_API_KEY = "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";
 
 const SYSTEM_PROMPT = `Ты — эксперт по физике плазмы и управляемому термоядерному синтезу. Твоя задача — помогать слушателям школьного доклада: объяснять простым языком принципы токамаков и стеллараторов, критерий Лоусона, реакцию D+T, преимущества ИТЭР. Отвечай на русском, кратко, но научно точно. Если вопрос не по теме, мягко возвращай разговор к термоядерной энергетике. Оформляй списки и важные термины (используй **жирный текст**).`;
 
@@ -75,14 +74,14 @@ export default function App() {
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+          "Authorization": `Bearer ${OPENROUTER_API_KEY.trim()}`,
           "Content-Type": "application/json",
           "HTTP-Referer": "http://localhost", // Используем localhost, как в вашем рабочем Python-скрипте
           "X-Title": "Fusion-AI" 
         },
         body: JSON.stringify({
-          // Используем проверенную вами бесплатную модель
-          model: "nvidia/nemotron-3-super-120b-a12b:free", 
+          // Используем запрашиваемую модель
+          model: "openrouter/free", 
           messages: apiMessages,
         })
       });
@@ -96,6 +95,10 @@ export default function App() {
               errorMessage = errJson.error.message;
            }
         } catch(e) {}
+        
+        if (response.status === 401) {
+           throw new Error(`Ошибка авторизации (401). Ваш API-ключ недействителен, удален или заблокирован в OpenRouter. Сгенерируйте новый ключ на сайте OpenRouter. (${errorMessage})`);
+        }
         
         if (response.status === 403) {
            throw new Error(`Лимит ключа OpenRouter исчерпан или доступ запрещен. Проверьте лимиты на https://openrouter.ai/settings/keys. Подробности: ${errorMessage}`);
