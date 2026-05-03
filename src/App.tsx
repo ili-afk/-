@@ -5,9 +5,6 @@ import { Send, Loader2, MessageSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// ВАЖНО: В реальных (коммерческих) проектах хранить токены на клиенте небезопасно!
-const OPENROUTER_API_KEY = "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";
-
 const SYSTEM_PROMPT = `Ты — эксперт по физике плазмы и управляемому термоядерному синтезу. Твоя задача — помогать слушателям школьного доклада: объяснять простым языком принципы токамаков и стеллараторов, критерий Лоусона, реакцию D+T, преимущества ИТЭР. Отвечай на русском, кратко, но научно точно. Если вопрос не по теме, мягко возвращай разговор к термоядерной энергетике. Оформляй списки и важные термины (используй **жирный текст**).`;
 
 interface Message {
@@ -41,12 +38,22 @@ const FAQ_ITEMS = [
 ];
 
 export default function App() {
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openRouterApiKey') || '');
+  const [showKeyModal, setShowKeyModal] = useState(!localStorage.getItem('openRouterApiKey'));
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Привет! Я — **Термояд-ИИ**, ваш интерактивный эксперт по физике плазмы. Задавайте любые вопросы по теме доклада «Термоядерный синтез — энергия будущего»!' }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (apiKey) {
+      localStorage.setItem('openRouterApiKey', apiKey);
+    } else {
+      localStorage.removeItem('openRouterApiKey');
+    }
+  }, [apiKey]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -58,6 +65,11 @@ export default function App() {
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
+
+    if (!apiKey.trim()) {
+      setShowKeyModal(true);
+      return;
+    }
 
     const userMessage: Message = { role: 'user', content: text.trim() };
     const newMessages = [...messages, userMessage];
@@ -74,7 +86,7 @@ export default function App() {
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${OPENROUTER_API_KEY.trim()}`,
+          "Authorization": `Bearer ${apiKey.trim()}`,
           "Content-Type": "application/json",
           "HTTP-Referer": "http://localhost", // Используем localhost, как в вашем рабочем Python-скрипте
           "X-Title": "Fusion-AI" 
@@ -136,10 +148,18 @@ export default function App() {
             <p className="text-[10px] text-orange-500 tracking-[0.2em] uppercase font-semibold hidden sm:block">Эксперт по синтезу будущего</p>
           </div>
         </div>
-        <div className="hidden md:flex gap-6 text-[11px] uppercase tracking-widest font-medium opacity-70">
-          <a href="#" className="hover:text-orange-500 transition-colors">ITER Project</a>
-          <a href="#" className="hover:text-orange-500 transition-colors">Физика Плазмы</a>
-          <a href="#" className="hover:text-orange-500 transition-colors">Контакт</a>
+        <div className="flex items-center gap-4 text-[11px] uppercase tracking-widest font-medium opacity-70 z-30">
+          <div className="hidden md:flex gap-6 items-center">
+            <a href="#" className="hover:text-orange-500 transition-colors">ITER Project</a>
+            <a href="#" className="hover:text-orange-500 transition-colors">Физика Плазмы</a>
+          </div>
+          <button 
+            onClick={() => setShowKeyModal(true)}
+            className="px-2 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded transition-colors uppercase tracking-wider text-[10px] text-white flex items-center gap-2 shadow-sm"
+          >
+            <span>Ключ API</span>
+            <span className={apiKey ? "text-green-400" : "text-red-400"}>{apiKey ? '✔' : '✖'}</span>
+          </button>
         </div>
       </nav>
 
@@ -310,6 +330,47 @@ export default function App() {
           </div>
         </aside>
       </main>
+
+      {/* API Key Modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <h2 className="text-xl font-bold text-white mb-4">API Ключ OpenRouter</h2>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+              Для работы приложения нужен ваш собственный API ключ OpenRouter. 
+              Ключ никуда не отправляется, кроме серверов OpenRouter, и хранится только локально в вашем браузере.
+            </p>
+            <input 
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-or-v1-..."
+              className="w-full bg-black border border-white/10 rounded-lg p-3 text-sm focus:outline-none focus:border-orange-500/50 text-slate-200 mb-6 font-mono"
+            />
+            <div className="flex justify-end gap-3">
+              {apiKey.trim() && (
+                <button 
+                  onClick={() => setShowKeyModal(false)} 
+                  className="px-6 py-2.5 rounded-lg text-sm bg-white/5 hover:bg-white/10 text-slate-300 transition-colors font-medium border border-transparent"
+                >
+                  Закрыть
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (apiKey.trim()) {
+                    setShowKeyModal(false);
+                  }
+                }} 
+                disabled={!apiKey.trim()}
+                className="px-6 py-2.5 rounded-lg text-sm bg-orange-600 hover:bg-orange-500 text-white disabled:opacity-50 transition-colors font-medium"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
